@@ -46,5 +46,12 @@ class SlackAlertChannel(BaseAlertChannel):
             response = requests.post(self._webhook_url, json=payload, timeout=10)
             response.raise_for_status()
             logger.debug("Slack alert sent for pipeline '%s'.", message.result.pipeline_name)
+        except requests.exceptions.HTTPError as exc:
+            logger.error(
+                "Slack webhook returned HTTP %s for pipeline '%s': %s",
+                exc.response.status_code if exc.response is not None else "unknown",
+                message.result.pipeline_name,
+                exc,
+            )
         except requests.RequestException as exc:
-            logger.error("Failed to send Slack alert: %s", exc)
+            logger.error("Failed to send Slack alert for pipeline '%s': %s", message.result.pipeline_name, exc)
