@@ -1,32 +1,24 @@
 """Backend registry for pipewatch."""
-
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Type
+from typing import Type
 
-if TYPE_CHECKING:
-    from pipewatch.backends.base import BaseBackend
+from pipewatch.backends.base import BaseBackend
 
-_REGISTRY: dict[str, Type["BaseBackend"]] = {}
+_REGISTRY: dict[str, Type[BaseBackend]] = {}
 
 
-def register_backend(name: str, cls: Type["BaseBackend"]) -> None:
-    """Register *cls* under *name* in the global backend registry."""
+def register_backend(name: str, cls: Type[BaseBackend]) -> None:
+    """Register a backend class under *name*."""
     _REGISTRY[name] = cls
 
 
-def get_backend_class(name: str) -> Type["BaseBackend"]:
-    """Return the backend class registered under *name*.
-
-    Raises
-    ------
-    KeyError
-        If no backend with *name* is registered.
-    """
+def get_backend_class(name: str) -> Type[BaseBackend]:
+    """Return the backend class for *name*, raising KeyError if unknown."""
     if name not in _REGISTRY:
         available = ", ".join(sorted(_REGISTRY))
         raise KeyError(
-            f"Unknown backend '{name}'. Available backends: {available}"
+            f"Unknown backend {name!r}. Available backends: {available}"
         )
     return _REGISTRY[name]
 
@@ -42,6 +34,7 @@ def _register_builtins() -> None:
     from pipewatch.backends.redis import RedisBackend
     from pipewatch.backends.elasticsearch import ElasticsearchBackend
     from pipewatch.backends.http import HTTPBackend
+    from pipewatch.backends.snowflake import SnowflakeBackend
 
     register_backend("dummy", DummyBackend)
     register_backend("airflow", AirflowBackend)
@@ -53,6 +46,7 @@ def _register_builtins() -> None:
     register_backend("redis", RedisBackend)
     register_backend("elasticsearch", ElasticsearchBackend)
     register_backend("http", HTTPBackend)
+    register_backend("snowflake", SnowflakeBackend)
 
 
 _register_builtins()

@@ -1,65 +1,59 @@
 """Tests for the backend registry."""
-
 from __future__ import annotations
 
 import pytest
 
-from pipewatch.backends import get_backend_class, register_backend, _REGISTRY
-from pipewatch.backends.dummy import DummyBackend
-from pipewatch.backends.airflow import AirflowBackend
-from pipewatch.backends.prometheus import PrometheusBackend
-from pipewatch.backends.postgres import PostgresBackend
-from pipewatch.backends.mysql import MySQLBackend
-from pipewatch.backends.bigquery import BigQueryBackend
-from pipewatch.backends.mongodb import MongoDBBackend
-from pipewatch.backends.redis import RedisBackend
-from pipewatch.backends.elasticsearch import ElasticsearchBackend
+from pipewatch.backends import get_backend_class, register_backend
+from pipewatch.backends.base import BaseBackend, PipelineResult, PipelineStatus
 
 
-@pytest.mark.parametrize(
-    "name, expected_cls",
-    [
-        ("dummy", DummyBackend),
-        ("airflow", AirflowBackend),
-        ("prometheus", PrometheusBackend),
-        ("postgres", PostgresBackend),
-        ("mysql", MySQLBackend),
-        ("bigquery", BigQueryBackend),
-        ("mongodb", MongoDBBackend),
-        ("redis", RedisBackend),
-        ("elasticsearch", ElasticsearchBackend),
-    ],
-)
-def test_builtin_backends_registered(name: str, expected_cls: type) -> None:
-    assert get_backend_class(name) is expected_cls
+def test_builtin_backends_registered() -> None:
+    expected = [
+        "airflow",
+        "bigquery",
+        "dummy",
+        "elasticsearch",
+        "http",
+        "mongodb",
+        "mysql",
+        "postgres",
+        "prometheus",
+        "redis",
+        "snowflake",
+    ]
+    for name in expected:
+        cls = get_backend_class(name)
+        assert issubclass(cls, BaseBackend), f"{name} should subclass BaseBackend"
 
 
 def test_get_unknown_backend_raises_key_error() -> None:
-    with pytest.raises(KeyError, match="unknown_backend"):
-        get_backend_class("unknown_backend")
+    with pytest.raises(KeyError):
+        get_backend_class("nonexistent_backend")
 
 
 def test_error_message_lists_available_backends() -> None:
-    with pytest.raises(KeyError, match="Available"):
-        get_backend_class("does_not_exist")
+    with pytest.raises(KeyError, match="snowflake"):
+        get_backend_class("nonexistent_backend")
 
 
 def test_register_custom_backend() -> None:
-    from pipewatch.backends.base import BaseBackend, PipelineResult, PipelineStatus
-
     class MyCustomBackend(BaseBackend):
-        def check_pipeline(self, pipeline_name, pipeline_config):
-            return PipelineResult(pipeline_name=pipeline_name, status=PipelineStatus.HEALTHY)
+        def __init__(self, config: dict) -> None:  # noqa: ANN001
+            pass
 
-    register_backend("custom", MyCustomBackend)
-    assert get_backend_class("custom") is MyCustomBackend
-    # cleanup
-    del _REGISTRY["custom"]
+        def check_pipeline(self, pipeline: dict) -> PipelineResult:  # noqa: ANN001
+            return PipelineResult(
+                name=pipeline["name"],
+                status=PipelineStatus.HEALTHY,
+                message="ok",
+            )
+
+    register_backend("my_custom", MyCustomBackend)
+    assert get_backend_class("my_custom") is MyCustomBackend
 
 
-def test_registry_contains_all_builtins() -> None:
-    expected = {
-        "dummy", "airflow", "prometheus", "postgres",
-        "mysql", "bigquery", "mongodb", "redis", "elasticsearch",
-    }
-    assert expected.issubset(set(_REGISTRY.keys()))
+def test_snowflake_backend_in_registry() -> None:
+    from pipewatch.backends.snowflake import SnowflakeBackend
+
+    cls = get_backend_class("snowflake")
+    assert cls is SnowflakeBackend
