@@ -1,41 +1,47 @@
-"""Backend registry for pipewatch."""
+"""Backend registry for pipewatch.
+
+Provides :func:`register_backend` and :func:`get_backend_class` for
+managing pluggable pipeline-health backends.
+"""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Type
+from typing import Type
 
-if TYPE_CHECKING:
-    from pipewatch.backends.base import BaseBackend
+from pipewatch.backends.base import BaseBackend
 
-_REGISTRY: dict[str, Type["BaseBackend"]] = {}
+_REGISTRY: dict[str, Type[BaseBackend]] = {}
 
 
-def register_backend(name: str, cls: Type["BaseBackend"]) -> None:
-    """Register a backend class under the given name."""
+def register_backend(name: str, cls: Type[BaseBackend]) -> None:
+    """Register a backend class under *name*."""
     _REGISTRY[name] = cls
 
 
-def get_backend_class(name: str) -> Type["BaseBackend"]:
-    """Return the backend class for *name*, raising KeyError if unknown."""
-    _register_builtins()
+def get_backend_class(name: str) -> Type[BaseBackend]:
+    """Return the backend class registered under *name*.
+
+    Raises
+    ------
+    KeyError
+        If no backend with *name* has been registered.
+    """
     if name not in _REGISTRY:
         raise KeyError(
-            f"Unknown backend '{name}'. Available: {sorted(_REGISTRY)}"
+            f"Unknown backend {name!r}. Available: {sorted(_REGISTRY)}"
         )
     return _REGISTRY[name]
 
 
 def _register_builtins() -> None:
-    """Lazily import and register all built-in backends."""
-    if _REGISTRY:
-        return
-
+    """Register all built-in backends."""
     from pipewatch.backends.dummy import DummyBackend
     from pipewatch.backends.airflow import AirflowBackend
     from pipewatch.backends.prometheus import PrometheusBackend
     from pipewatch.backends.postgres import PostgresBackend
     from pipewatch.backends.mysql import MySQLBackend
     from pipewatch.backends.bigquery import BigQueryBackend
+    from pipewatch.backends.mongodb import MongoDBBackend
 
     register_backend("dummy", DummyBackend)
     register_backend("airflow", AirflowBackend)
@@ -43,3 +49,7 @@ def _register_builtins() -> None:
     register_backend("postgres", PostgresBackend)
     register_backend("mysql", MySQLBackend)
     register_backend("bigquery", BigQueryBackend)
+    register_backend("mongodb", MongoDBBackend)
+
+
+_register_builtins()
