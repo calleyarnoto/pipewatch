@@ -1,8 +1,4 @@
-"""Backend registry for pipewatch.
-
-Provides :func:`register_backend` and :func:`get_backend_class` for
-managing pluggable pipeline-health backends.
-"""
+"""Backend registry for pipewatch."""
 
 from __future__ import annotations
 
@@ -28,13 +24,12 @@ def get_backend_class(name: str) -> Type[BaseBackend]:
     """
     if name not in _REGISTRY:
         raise KeyError(
-            f"Unknown backend {name!r}. Available: {sorted(_REGISTRY)}"
+            f"Unknown backend '{name}'. Available: {sorted(_REGISTRY)}"
         )
     return _REGISTRY[name]
 
 
 def _register_builtins() -> None:
-    """Register all built-in backends."""
     from pipewatch.backends.dummy import DummyBackend
     from pipewatch.backends.airflow import AirflowBackend
     from pipewatch.backends.prometheus import PrometheusBackend
@@ -42,6 +37,8 @@ def _register_builtins() -> None:
     from pipewatch.backends.mysql import MySQLBackend
     from pipewatch.backends.bigquery import BigQueryBackend
     from pipewatch.backends.mongodb import MongoDBBackend
+    from pipewatch.backends.redis import RedisBackend
+    from pipewatch.backends.elasticsearch import ElasticsearchBackend
 
     register_backend("dummy", DummyBackend)
     register_backend("airflow", AirflowBackend)
@@ -50,6 +47,8 @@ def _register_builtins() -> None:
     register_backend("mysql", MySQLBackend)
     register_backend("bigquery", BigQueryBackend)
     register_backend("mongodb", MongoDBBackend)
+    register_backend("redis", RedisBackend)
+    register_backend("elasticsearch", ElasticsearchBackend)
 
 
 _register_builtins()
