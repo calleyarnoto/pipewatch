@@ -1,7 +1,7 @@
 """Backend registry for pipewatch.
 
-Backends are registered by their ``name`` attribute so that config files can
-refer to them by string (e.g. ``backend: airflow``).
+Built-in backends are registered here; third-party backends can call
+``register_backend`` to add their own.
 """
 
 from __future__ import annotations
@@ -9,13 +9,13 @@ from __future__ import annotations
 from typing import Dict, Type
 
 from pipewatch.backends.base import BaseBackend
-from pipewatch.backends.dummy import DummyBackend
-from pipewatch.backends.airflow import AirflowBackend
 
-_REGISTRY: Dict[str, Type[BaseBackend]] = {
-    DummyBackend.name: DummyBackend,
-    AirflowBackend.name: AirflowBackend,
-}
+_REGISTRY: Dict[str, Type[BaseBackend]] = {}
+
+
+def register_backend(name: str, cls: Type[BaseBackend]) -> None:
+    """Register a backend class under *name*."""
+    _REGISTRY[name.lower()] = cls
 
 
 def get_backend_class(name: str) -> Type[BaseBackend]:
@@ -24,37 +24,29 @@ def get_backend_class(name: str) -> Type[BaseBackend]:
     Raises
     ------
     KeyError
-        If no backend with that name has been registered.
+        If no backend with that name is registered.
     """
-    try:
-        return _REGISTRY[name]
-    except KeyError:
-        available = ", ".join(sorted(_REGISTRY))
+    key = name.lower()
+    if key not in _REGISTRY:
         raise KeyError(
-            f"Unknown backend {name!r}. Available backends: {available}"
-        ) from None
+            f"Unknown backend '{name}'. Available backends: {sorted(_REGISTRY)}"
+        )
+    return _REGISTRY[key]
 
 
-def register_backend(cls: Type[BaseBackend]) -> Type[BaseBackend]:
-    """Register a custom backend class (decorator or direct call).
+def _register_builtins() -> None:
+    """Lazily import and register all built-in backends."""
+    from pipewatch.backends.airflow import AirflowBackend
+    from pipewatch.backends.dummy import DummyBackend
+    from pipewatch.backends.postgres import PostgresBackend
+    from pipewatch.backends.prometheus import PrometheusBackend
 
-    Example
-    -------
-    >>> from pipewatch.backends import register_backend
-    >>> from pipewatch.backends.base import BaseBackend
-    >>> @register_backend
-    ... class MyBackend(BaseBackend):
-    ...     name = "my_backend"
-    ...     def check_pipeline(self, pipeline_id, **kwargs): ...
-    """
-    _REGISTRY[cls.name] = cls
-    return cls
+    register_backend("airflow", AirflowBackend)
+    register_backend("dummy", DummyBackend)
+    register_backend("postgres", PostgresBackend)
+    register_backend("prometheus", PrometheusBackend)
 
 
-__all__ = [
-    "BaseBackend",
-    "DummyBackend",
-    "AirflowBackend",
-    "get_backend_class",
-    "register_backend",
-]
+_register_builtins()
+
+__all__ = ["get_backend_class", "register_backend"]
