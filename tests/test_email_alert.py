@@ -45,6 +45,11 @@ def test_build_message_subject_contains_pipeline_name(channel, failing_result):
     assert "orders_etl" in msg["Subject"]
 
 
+def test_build_message_subject_contains_status(channel, failing_result):
+    msg = channel._build_message(failing_result)
+    assert "FAILED" in msg["Subject"]
+
+
 def test_build_message_from_address(channel, healthy_result):
     msg = channel._build_message(healthy_result)
     assert msg["From"] == "pipewatch@example.com"
@@ -60,6 +65,12 @@ def test_build_message_body_contains_status(channel, failing_result):
     msg = channel._build_message(failing_result)
     payload = msg.as_string()
     assert "FAILED" in payload
+
+
+def test_build_message_body_contains_message_text(channel, failing_result):
+    msg = channel._build_message(failing_result)
+    payload = msg.as_string()
+    assert "DAG failed" in payload
 
 
 @patch("pipewatch.alerts.email.smtplib.SMTP")
