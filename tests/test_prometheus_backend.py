@@ -61,6 +61,17 @@ def test_unknown_on_request_exception(mock_get, backend):
 
 
 @patch("pipewatch.backends.prometheus.requests.get")
+def test_unknown_on_http_error(mock_get, backend):
+    """A non-2xx HTTP response should result in UNKNOWN status."""
+    resp = MagicMock()
+    resp.raise_for_status.side_effect = requests.HTTPError("503 Service Unavailable")
+    mock_get.return_value = resp
+    result = backend.check_pipeline("my_pipeline")
+    assert result.status == PipelineStatus.UNKNOWN
+    assert "503" in result.message
+
+
+@patch("pipewatch.backends.prometheus.requests.get")
 def test_query_uses_pipeline_name(mock_get, backend):
     mock_get.return_value = _mock_response([[{}, [0, "1"]]])
     backend.check_pipeline("sales_etl")
