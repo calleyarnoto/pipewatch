@@ -1,41 +1,43 @@
-"""Registry for alert channel backends."""
+"""Registry for alert channel implementations."""
 
 from __future__ import annotations
 
-from typing import Dict, Type
+import logging
+from typing import Type
 
 from pipewatch.alerts import BaseAlertChannel
 
-_registry: Dict[str, Type[BaseAlertChannel]] = {}
+logger = logging.getLogger(__name__)
+
+_REGISTRY: dict[str, Type[BaseAlertChannel]] = {}
 
 
 def register_channel(name: str, cls: Type[BaseAlertChannel]) -> None:
     """Register an alert channel class under *name*."""
-    _registry[name] = cls
+    if name in _REGISTRY:
+        logger.debug("Overwriting alert channel registration for '%s'", name)
+    _REGISTRY[name] = cls
+    logger.debug("Registered alert channel '%s' -> %s", name, cls.__qualname__)
 
 
 def get_channel_class(name: str) -> Type[BaseAlertChannel]:
-    """Return the alert channel class registered under *name*.
+    """Return the channel class registered under *name*.
 
     Raises
     ------
     KeyError
-        If *name* has not been registered.
+        If no channel is registered under *name*.
     """
-    _register_builtins()
-    if name not in _registry:
-        available = ", ".join(sorted(_registry))
+    if name not in _REGISTRY:
+        available = ", ".join(sorted(_REGISTRY))
         raise KeyError(
             f"Unknown alert channel '{name}'. Available channels: {available}"
         )
-    return _registry[name]
+    return _REGISTRY[name]
 
 
 def _register_builtins() -> None:
-    """Lazily register all built-in alert channels."""
-    if _registry:
-        return
-
+    """Register all built-in alert channel implementations."""
     from pipewatch.alerts.slack import SlackAlertChannel
     from pipewatch.alerts.email import EmailAlertChannel
     from pipewatch.alerts.pagerduty import PagerDutyAlertChannel
@@ -44,12 +46,21 @@ def _register_builtins() -> None:
     from pipewatch.alerts.victorops import VictorOpsAlertChannel
     from pipewatch.alerts.teams import TeamsAlertChannel
     from pipewatch.alerts.discord import DiscordAlertChannel
+    from pipewatch.alerts.sms import SMSAlertChannel
 
-    register_channel("slack", SlackAlertChannel)
-    register_channel("email", EmailAlertChannel)
-    register_channel("pagerduty", PagerDutyAlertChannel)
-    register_channel("webhook", WebhookAlertChannel)
-    register_channel("opsgenie", OpsGenieAlertChannel)
-    register_channel("victorops", VictorOpsAlertChannel)
-    register_channel("teams", TeamsAlertChannel)
-    register_channel("discord", DiscordAlertChannel)
+    _builtins: list[tuple[str, Type[BaseAlertChannel]]] = [
+        ("slack", SlackAlertChannel),
+        ("email", EmailAlertChannel),
+        ("pagerduty", PagerDutyAlertChannel),
+        ("webhook", WebhookAlertChannel),
+        ("opsgenie", OpsGenieAlertChannel),
+        ("victorops", VictorOpsAlertChannel),
+        ("teams", TeamsAlertChannel),
+        ("discord", DiscordAlertChannel),
+        ("sms", SMSAlertChannel),
+    ]
+    for channel_name, cls in _builtins:
+        register_channel(channel_name, cls)
+
+
+_register_builtins()
