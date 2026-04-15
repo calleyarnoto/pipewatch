@@ -61,16 +61,30 @@ class PostgresBackend(BaseBackend):
             message = "Query returned no rows"
         else:
             value = float(row[0])
-            if value >= self.threshold:
-                status = PipelineStatus.HEALTHY
-                message = f"Query returned {value} (threshold={self.threshold})"
-            else:
-                status = PipelineStatus.FAILED
-                message = f"Query returned {value} (threshold={self.threshold})"
+            status, message = self._evaluate_value(value)
 
         return PipelineResult(
             pipeline_name=pipeline_name,
             status=status,
             checked_at=datetime.now(timezone.utc),
             message=message,
+        )
+
+    def _evaluate_value(self, value: float) -> tuple[PipelineStatus, str]:
+        """Determine pipeline status and message from a numeric query result.
+
+        Args:
+            value: The numeric value returned by the pipeline query.
+
+        Returns:
+            A tuple of (PipelineStatus, message string).
+        """
+        if value >= self.threshold:
+            return (
+                PipelineStatus.HEALTHY,
+                f"Query returned {value} (threshold={self.threshold})",
+            )
+        return (
+            PipelineStatus.FAILED,
+            f"Query returned {value} (threshold={self.threshold})",
         )
