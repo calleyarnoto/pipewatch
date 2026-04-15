@@ -25,6 +25,13 @@ def backend():
 
 
 def _pipeline(name: str = "my_pipeline", key: str = "etl:my_pipeline", threshold: int | None = None):
+    """Build a minimal pipeline SimpleNamespace for testing.
+
+    Args:
+        name: The pipeline name.
+        key: The Redis key to check.
+        threshold: Optional per-pipeline threshold; omitted from config when None.
+    """
     cfg: dict = {"key": key}
     if threshold is not None:
         cfg["threshold"] = threshold
@@ -89,3 +96,11 @@ def test_pipeline_name_in_result(backend):
     mock_client.get.return_value = "2"
     result = instance.check_pipeline(_pipeline(name="orders_etl"))
     assert result.pipeline_name == "orders_etl"
+
+
+def test_healthy_when_value_exactly_equals_threshold(backend):
+    """Boundary check: a value exactly equal to the threshold should be HEALTHY."""
+    instance, mock_client = backend
+    mock_client.get.return_value = "3"
+    result = instance.check_pipeline(_pipeline(threshold=3))
+    assert result.status == PipelineStatus.HEALTHY
