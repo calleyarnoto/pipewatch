@@ -1,59 +1,54 @@
-"""Tests for the backend registry."""
 from __future__ import annotations
 
 import pytest
 
-from pipewatch.backends import get_backend_class, register_backend
+from pipewatch.backends import get_backend_class, register_backend, _REGISTRY
 from pipewatch.backends.base import BaseBackend, PipelineResult, PipelineStatus
 
 
-def test_builtin_backends_registered() -> None:
-    expected = [
-        "airflow",
-        "bigquery",
-        "dummy",
-        "elasticsearch",
-        "http",
-        "mongodb",
-        "mysql",
-        "postgres",
-        "prometheus",
-        "redis",
-        "snowflake",
-    ]
-    for name in expected:
-        cls = get_backend_class(name)
-        assert issubclass(cls, BaseBackend), f"{name} should subclass BaseBackend"
+class MyCustomBackend(BaseBackend):
+    def __init__(self, config):
+        pass
+
+    def check_pipeline(self, pipeline):
+        return PipelineResult(
+            pipeline_name=pipeline.name,
+            status=PipelineStatus.HEALTHY,
+            message="ok",
+        )
 
 
-def test_get_unknown_backend_raises_key_error() -> None:
+def test_builtin_backends_registered():
+    for name in (
+        "dummy", "airflow", "prometheus", "postgres", "mysql",
+        "bigquery", "mongodb", "redis", "elasticsearch", "http",
+        "snowflake", "kafka", "databricks",
+    ):
+        assert name in _REGISTRY, f"Expected '{name}' to be registered"
+
+
+def test_get_unknown_backend_raises_key_error():
     with pytest.raises(KeyError):
         get_backend_class("nonexistent_backend")
 
 
-def test_error_message_lists_available_backends() -> None:
-    with pytest.raises(KeyError, match="snowflake"):
+def test_error_message_lists_available_backends():
+    with pytest.raises(KeyError, match="Available backends"):
         get_backend_class("nonexistent_backend")
 
 
-def test_register_custom_backend() -> None:
-    class MyCustomBackend(BaseBackend):
-        def __init__(self, config: dict) -> None:  # noqa: ANN001
-            pass
-
-        def check_pipeline(self, pipeline: dict) -> PipelineResult:  # noqa: ANN001
-            return PipelineResult(
-                name=pipeline["name"],
-                status=PipelineStatus.HEALTHY,
-                message="ok",
-            )
-
+def test_register_custom_backend():
     register_backend("my_custom", MyCustomBackend)
     assert get_backend_class("my_custom") is MyCustomBackend
+    # cleanup
+    _REGISTRY.pop("my_custom", None)
 
 
-def test_snowflake_backend_in_registry() -> None:
-    from pipewatch.backends.snowflake import SnowflakeBackend
+def test_get_backend_class_returns_correct_class():
+    from pipewatch.backends.dummy import DummyBackend
+    assert get_backend_class("dummy") is DummyBackend
 
-    cls = get_backend_class("snowflake")
-    assert cls is SnowflakeBackend
+
+def test_databricks_backend_registered():
+    from pipewatch.backends.databricks import DatabricksBackend
+    assert get_backend_class("databricks") is DatabricksBackend

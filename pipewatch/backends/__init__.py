@@ -1,4 +1,3 @@
-"""Backend registry for pipewatch."""
 from __future__ import annotations
 
 from typing import Type
@@ -18,7 +17,7 @@ def get_backend_class(name: str) -> Type[BaseBackend]:
     if name not in _REGISTRY:
         available = ", ".join(sorted(_REGISTRY))
         raise KeyError(
-            f"Unknown backend {name!r}. Available backends: {available}"
+            f"Unknown backend '{name}'. Available backends: {available}"
         )
     return _REGISTRY[name]
 
@@ -35,6 +34,8 @@ def _register_builtins() -> None:
     from pipewatch.backends.elasticsearch import ElasticsearchBackend
     from pipewatch.backends.http import HTTPBackend
     from pipewatch.backends.snowflake import SnowflakeBackend
+    from pipewatch.backends.kafka import KafkaBackend
+    from pipewatch.backends.databricks import DatabricksBackend
 
     register_backend("dummy", DummyBackend)
     register_backend("airflow", AirflowBackend)
@@ -47,6 +48,8 @@ def _register_builtins() -> None:
     register_backend("elasticsearch", ElasticsearchBackend)
     register_backend("http", HTTPBackend)
     register_backend("snowflake", SnowflakeBackend)
+    register_backend("kafka", KafkaBackend)
+    register_backend("databricks", DatabricksBackend)
 
 
 _register_builtins()
