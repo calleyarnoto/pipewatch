@@ -1,20 +1,18 @@
 """Backend registry for pipewatch."""
 from __future__ import annotations
 
-from typing import Type
+from typing import Dict, Type
 
 from pipewatch.backends.base import BaseBackend
 
-_REGISTRY: dict[str, Type[BaseBackend]] = {}
+_REGISTRY: Dict[str, Type[BaseBackend]] = {}
 
 
 def register_backend(name: str, cls: Type[BaseBackend]) -> None:
-    """Register a backend class under *name* (case-insensitive)."""
     _REGISTRY[name.lower()] = cls
 
 
 def get_backend_class(name: str) -> Type[BaseBackend]:
-    """Return the backend class for *name*, raising KeyError if unknown."""
     key = name.lower()
     if key not in _REGISTRY:
         available = ", ".join(sorted(_REGISTRY))
@@ -25,19 +23,21 @@ def get_backend_class(name: str) -> Type[BaseBackend]:
 def _register_builtins() -> None:
     from pipewatch.backends.airflow import AirflowBackend
     from pipewatch.backends.azure_blob import AzureBlobBackend
+    from pipewatch.backends.azure_eventhub import AzureEventHubBackend
     from pipewatch.backends.bigquery import BigQueryBackend
     from pipewatch.backends.celery import CeleryBackend
     from pipewatch.backends.cloudwatch import CloudWatchBackend
-    from pipewatch.backends.databricks import DatabricksBackend
     from pipewatch.backends.datadog import DatadogBackend
-    from pipewatch.backends.dummy import DummyBackend
+    from pipewatch.backends.databricks import DatabricksBackend
     from pipewatch.backends.dynamodb import DynamoDBBackend
+    from pipewatch.backends.dummy import DummyBackend
     from pipewatch.backends.elasticsearch import ElasticsearchBackend
     from pipewatch.backends.ftp import FTPBackend
     from pipewatch.backends.gcs import GCSBackend
     from pipewatch.backends.graphql import GraphQLBackend
     from pipewatch.backends.grpc import GRPCBackend
     from pipewatch.backends.http import HTTPBackend
+    from pipewatch.backends.influxdb import InfluxDBBackend
     from pipewatch.backends.kafka import KafkaBackend
     from pipewatch.backends.mongodb import MongoDBBackend
     from pipewatch.backends.mysql import MySQLBackend
@@ -54,19 +54,21 @@ def _register_builtins() -> None:
 
     register_backend("airflow", AirflowBackend)
     register_backend("azure_blob", AzureBlobBackend)
+    register_backend("azure_eventhub", AzureEventHubBackend)
     register_backend("bigquery", BigQueryBackend)
     register_backend("celery", CeleryBackend)
     register_backend("cloudwatch", CloudWatchBackend)
-    register_backend("databricks", DatabricksBackend)
     register_backend("datadog", DatadogBackend)
-    register_backend("dummy", DummyBackend)
+    register_backend("databricks", DatabricksBackend)
     register_backend("dynamodb", DynamoDBBackend)
+    register_backend("dummy", DummyBackend)
     register_backend("elasticsearch", ElasticsearchBackend)
     register_backend("ftp", FTPBackend)
     register_backend("gcs", GCSBackend)
     register_backend("graphql", GraphQLBackend)
     register_backend("grpc", GRPCBackend)
     register_backend("http", HTTPBackend)
+    register_backend("influxdb", InfluxDBBackend)
     register_backend("kafka", KafkaBackend)
     register_backend("mongodb", MongoDBBackend)
     register_backend("mysql", MySQLBackend)
