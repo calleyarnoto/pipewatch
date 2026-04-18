@@ -71,14 +71,29 @@ class DatadogBackend(BaseBackend):
             return PipelineResult(
                 pipeline_name=pipeline.name,
                 status=PipelineStatus.HEALTHY if healthy else PipelineStatus.FAILED,
-                message=f"Latest value {latest_value} {'>=': '>='} threshold {threshold}"
-                if healthy
-                else f"Latest value {latest_value} < threshold {threshold}",
+                message=(
+                    f"Latest value {latest_value} >= threshold {threshold}"
+                    if healthy
+                    else f"Latest value {latest_value} < threshold {threshold}"
+                ),
+            )
+        except requests.HTTPError as exc:
+            status_code = exc.response.status_code if exc.response is not None else "unknown"
+            logger.warning(
+                "Datadog request failed for %s with HTTP %s: %s",
+                pipeline.name,
+                status_code,
+                exc,
+            )
+            return PipelineResult(
+                pipeline_name=pipeline.name,
+                status=PipelineStatus.UNKNOWN,
+                message=f"Datadog HTTP error {status_code}: {exc}",
             )
         except requests.RequestException as exc:
             logger.warning("Datadog request failed for %s: %s", pipeline.name, exc)
             return PipelineResult(
                 pipeline_name=pipeline.name,
                 status=PipelineStatus.UNKNOWN,
-                message=f"Request error: {exc}",
+                message=f"Datadog request error: {exc}",
             )
