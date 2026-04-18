@@ -16,11 +16,20 @@ class BigQueryBackend(BaseBackend):
         self._threshold = int(config.get("threshold", 1))
         self._credentials_path = config.get("credentials_path", None)
 
-    def check_pipeline(self, pipeline_name: str, pipeline_config: dict[str, Any]) -> PipelineResult:
-        """Run a COUNT(*) query on BigQuery and compare against the threshold."""
+    def _get_client(self, project: str) -> Any:
+        """Create and return a BigQuery client, using service account credentials if configured."""
         from google.cloud import bigquery  # type: ignore[import]
         from google.oauth2 import service_account  # type: ignore[import]
 
+        if self._credentials_path:
+            creds = service_account.Credentials.from_service_account_file(
+                self._credentials_path
+            )
+            return bigquery.Client(project=project, credentials=creds)
+        return bigquery.Client(project=project)
+
+    def check_pipeline(self, pipeline_name: str, pipeline_config: dict[str, Any]) -> PipelineResult:
+        """Run a COUNT(*) query on BigQuery and compare against the threshold."""
         table = pipeline_config.get("table", pipeline_name)
         dataset = pipeline_config.get("dataset", self._dataset)
         project = pipeline_config.get("project", self._project)
@@ -33,14 +42,7 @@ class BigQueryBackend(BaseBackend):
             query += f" WHERE {where}"
 
         try:
-            if self._credentials_path:
-                creds = service_account.Credentials.from_service_account_file(
-                    self._credentials_path
-                )
-                client = bigquery.Client(project=project, credentials=creds)
-            else:
-                client = bigquery.Client(project=project)
-
+            client = self._get_client(project)
             rows = list(client.query(query).result())
             count = rows[0].cnt if rows else 0
         except Exception as exc:  # noqa: BLE001
