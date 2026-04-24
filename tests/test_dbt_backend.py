@@ -21,6 +21,7 @@ def _pipeline():
 
 
 def _mock_response(status_humanized: str, run_id: int = 1):
+    """Build a mock requests.Response for a dbt Cloud runs list endpoint."""
     resp = MagicMock()
     resp.json.return_value = {"data": [{"id": run_id, "status_humanized": status_humanized}]}
     resp.raise_for_status.return_value = None
@@ -74,3 +75,17 @@ def test_unknown_when_missing_job_id(backend):
     result = backend.check_pipeline(pipeline)
     assert result.status == PipelineStatus.UNKNOWN
     assert "job_id" in result.message
+
+
+@pytest.mark.parametrize("status_humanized,expected", [
+    ("Success", PipelineStatus.HEALTHY),
+    ("Error", PipelineStatus.FAILED),
+    ("Cancelled", PipelineStatus.FAILED),
+    ("Running", PipelineStatus.UNKNOWN),
+    ("Queued", PipelineStatus.UNKNOWN),
+])
+def test_status_mapping(backend, _pipeline, status_humanized, expected):
+    """Verify that each dbt run status maps to the correct PipelineStatus."""
+    with patch("pipewatch.backends.dbt.requests.get", return_value=_mock_response(status_humanized)):
+        result = backend.check_pipeline(_pipeline)
+    assert result.status == expected
