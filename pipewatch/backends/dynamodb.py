@@ -47,8 +47,7 @@ class DynamoDBBackend(BaseBackend):
             if index:
                 kwargs["IndexName"] = index
 
-            response = self._client.scan(**kwargs)
-            count: int = response.get("Count", 0)
+            count: int = self._get_total_count(kwargs)
 
             if count >= threshold:
                 return PipelineResult(
@@ -67,3 +66,20 @@ class DynamoDBBackend(BaseBackend):
                 status=PipelineStatus.UNKNOWN,
                 message=f"DynamoDB error: {exc}",
             )
+
+    def _get_total_count(self, kwargs: dict[str, Any]) -> int:
+        """Scan the table and accumulate the count across all paginated responses.
+
+        DynamoDB paginates scan results when the result set exceeds 1 MB.
+        Summing ``Count`` from every page ensures the returned value reflects
+        all matching items, not just the first page.
+        """
+        total = 0
+        while True:
+            response = self._client.scan(**kwargs)
+            total += response.get("Count", 0)
+            last_key = response.get("LastEvaluatedKey")
+            if not last_key:
+                break
+            kwargs["ExclusiveStartKey"] = last_key
+        return total
