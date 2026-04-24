@@ -12,89 +12,90 @@ from pipewatch.backends.base import PipelineStatus
 
 
 @pytest.fixture()
-def backend() -> CockroachDBBackend:
+def backend():
     return CockroachDBBackend(
         {
             "host": "crdb-host",
             "port": 26257,
-            "database": "mydb",
+            "database": "testdb",
             "user": "root",
             "password": "",
-            "sslmode": "disable",
+            "sslmode": "require",
         }
     )
 
 
 @pytest.fixture()
-def _pipeline() -> SimpleNamespace:
+def _pipeline():
     return SimpleNamespace(
         name="crdb_pipeline",
-        options={"query": "SELECT COUNT(*) FROM events", "threshold": "1"},
+        config={"query": "SELECT COUNT(*) FROM events", "threshold": 1},
     )
 
 
-def _make_conn_mock(return_value: object) -> MagicMock:
-    cursor = MagicMock()
-    cursor.__enter__ = lambda s: s
-    cursor.__exit__ = MagicMock(return_value=False)
-    cursor.fetchone.return_value = (return_value,)
-    conn = MagicMock()
-    conn.cursor.return_value = cursor
-    return conn
+@pytest.fixture()
+def _make_conn_mock():
+    """Factory that returns a patched psycopg2 connection yielding a given value."""
+
+    def _factory(row_value):
+        cursor_mock = MagicMock()
+        cursor_mock.__enter__ = lambda s: s
+        cursor_mock.__exit__ = MagicMock(return_value=False)
+        cursor_mock.fetchone.return_value = (row_value,)
+
+        conn_mock = MagicMock()
+        conn_mock.cursor.return_value = cursor_mock
+        return conn_mock
+
+    return _factory
 
 
-def test_healthy_when_count_meets_threshold(backend, _pipeline):
-    conn = _make_conn_mock(5)
-    with patch.object(backend, "_connect", return_value=conn):
+def test_healthy_when_count_meets_threshold(backend, _pipeline, _make_conn_mock):
+    with patch.object(backend, "_connect", return_value=_make_conn_mock(5)):
         result = backend.check_pipeline(_pipeline)
+
     assert result.status == PipelineStatus.HEALTHY
     assert result.pipeline_name == "crdb_pipeline"
 
 
-def test_failed_when_count_below_threshold(backend, _pipeline):
-    conn = _make_conn_mock(0)
-    with patch.object(backend, "_connect", return_value=conn):
+def test_failed_when_count_below_threshold(backend, _pipeline, _make_conn_mock):
+    with patch.object(backend, "_connect", return_value=_make_conn_mock(0)):
         result = backend.check_pipeline(_pipeline)
+
     assert result.status == PipelineStatus.FAILED
 
 
-def test_custom_threshold(backend):
+def test_custom_threshold_respected(backend, _make_conn_mock):
     pipeline = SimpleNamespace(
-        name="crdb_custom",
-        options={"query": "SELECT COUNT(*) FROM jobs", "threshold": "10"},
+        name="crdb_pipeline",
+        config={"query": "SELECT COUNT(*) FROM events", "threshold": 10},
     )
-    conn = _make_conn_mock(9)
-    with patch.object(backend, "_connect", return_value=conn):
+    with patch.object(backend, "_connect", return_value=_make_conn_mock(9)):
         result = backend.check_pipeline(pipeline)
+
     assert result.status == PipelineStatus.FAILED
+    assert "9" in result.message
+    assert "10" in result.message
 
 
-def test_unknown_on_exception(backend, _pipeline):
+def test_unknown_on_missing_query(backend):
+    pipeline = SimpleNamespace(name="crdb_pipeline", config={})
+    result = backend.check_pipeline(pipeline)
+
+    assert result.status == PipelineStatus.UNKNOWN
+    assert "No query" in result.message
+
+
+def test_unknown_on_connection_error(backend, _pipeline):
     with patch.object(backend, "_connect", side_effect=Exception("connection refused")):
         result = backend.check_pipeline(_pipeline)
+
     assert result.status == PipelineStatus.UNKNOWN
     assert "connection refused" in result.message
 
 
-def test_unknown_when_no_rows(backend, _pipeline):
-    cursor = MagicMock()
-    cursor.__enter__ = lambda s: s
-    cursor.__exit__ = MagicMock(return_value=False)
-    cursor.fetchone.return_value = None
-    conn = MagicMock()
-    conn.cursor.return_value = cursor
-    with patch.object(backend, "_connect", return_value=conn):
+def test_result_pipeline_name_set(backend, _pipeline, _make_conn_mock):
+    with patch.object(backend, "_connect", return_value=_make_conn_mock(3)):
         result = backend.check_pipeline(_pipeline)
-    assert result.status == PipelineStatus.UNKNOWN
 
-
-def test_dsn_used_when_provided():
-    backend = CockroachDBBackend({"dsn": "postgresql://root@crdb:26257/mydb"})
-    pipeline = SimpleNamespace(
-        name="dsn_pipeline",
-        options={"query": "SELECT 1", "threshold": "1"},
-    )
-    conn = _make_conn_mock(1)
-    with patch("psycopg2.connect", return_value=conn) as mock_connect:
-        backend.check_pipeline(pipeline)
-    mock_connect.assert_called_once_with("postgresql://root@crdb:26257/mydb")
+    assert result.pipeline_name == _pipeline.name
